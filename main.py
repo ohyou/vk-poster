@@ -6,6 +6,27 @@ import http.client, sys, json, os, vk, datetime, time, imghdr
 import requests as r
 from PIL import Image
 
+class Utils:
+
+	@staticmethod
+	def addTime(timestamp, mins):
+		return time.mktime(( datetime.datetime.fromtimestamp(float(timestamp)) + datetime.timedelta(minutes=mins)).timetuple())
+
+	@staticmethod
+	def findTimeGaps(posts, max_gap):
+		if len(posts) <= 0:
+			return []
+
+		gaps = []
+		previous_time = posts[1]['date']
+
+		for p in posts[1:]:
+			if (p['date'] - previous_time) > max_gap:
+				gaps.append(previous_time + max_gap)
+			previous_time = p['date']
+
+		return gaps
+
 class Connection:
 	def __init__(self):
 		self.established = False
@@ -57,9 +78,6 @@ class Group:
 	# 	return len(arr)
 
 	# def getTime #	find a hole or +1h from last post
-	#	return string?
-
-	# def addTime # utils?
 	#	return string?
 
 	def getScheduledPosts(self):
