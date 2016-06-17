@@ -1,31 +1,18 @@
 '''
-	For licence, see: LICENSE
+	For license, see: LICENSE
 '''
 
 import http.client, sys, json, os, vk, datetime, time, imghdr
 import requests as r
 from PIL import Image
+from redditdownload import download as DL
 
 class Utils:
 
 	@staticmethod
 	def addTime(timestamp, mins):
-		return time.mktime(( datetime.datetime.fromtimestamp(float(timestamp)) + datetime.timedelta(minutes=mins)).timetuple())
-
-	@staticmethod
-	def findTimeGaps(posts, max_gap):
-		if len(posts) <= 0:
-			return []
-
-		gaps = []
-		previous_time = posts[1]['date']
-
-		for p in posts[1:]:
-			if (p['date'] - previous_time) > max_gap:
-				gaps.append(previous_time + max_gap)
-			previous_time = p['date']
-
-		return gaps
+		return time.mktime((datetime.datetime.fromtimestamp(float(timestamp)) + 
+							datetime.timedelta(minutes=mins)).timetuple())
 
 class Connection:
 	def __init__(self):
@@ -66,22 +53,53 @@ class Group:
 		self.history = []
 		self.history_file = self.name + ".json"
 		self.scheduled_posts = []
-		#self.downloaded = False
+		self.post_time = time.time() # now
+		self.gaps = []
 
-	# Downloading with os.system("downloader.py")
-	# Posting logic here
-	# Utils here or in a separate class?
 
-	# TODO: posting time management
+	def download(self):
+		args = lambda: None
+		args.reddit = self.name
+		args.dir = "pics/" + self.name
+		args.last = ''
+		args.score = 0
+		args.num = 30
+		args.update = False
+		args.sfw = False
+		args.nsfw = False
+		args.regex = None
+		args.verbose = False
 
-	# def download
-	# 	return len(arr)
+		DL(args)
 
-	# def getTime #	find a hole or +1h from last post
-	#	return string?
+		path, dirs, files = next(os.walk(args.dir))
+		return len(files)
+		
+	def findTimeGaps(posts, max_gap):
+		if len(posts) <= 0:
+			return []
+
+		self.post_time = posts[-1:]['date']
+		previous_time = posts[1]['date']
+
+		for p in posts[1:]:
+			if (p['date'] - previous_time) > max_gap:
+				self.gaps.append(previous_time + max_gap)
+			previous_time = p['date']
+
+		return len(self.gaps)
+
+	def getTime(self):
+		if len(self.gaps) > 0:
+			return self.gaps.pop()
+
+		return Utils.addTime(self.post_time, 60)
+		
 
 	def getScheduledPosts(self):
-		self.scheduled_posts = self.conn.vkapi.wall.get(owner_id=self.id, count=100, filter="postponed")
+		self.scheduled_posts = self.conn.vkapi.wall.get(owner_id=self.id, 
+														count=100, 
+														filter="postponed")
 		return self.scheduled_posts[0]
 
 	def loadHistory(self):
@@ -105,6 +123,10 @@ class Group:
 			print ("ERROR: API authorization failed, aborting")
 			return
 
+		if self.download() <= 0:
+			print ("ERROR: Nothing was downloaded")
+			return
+
 		if self.loadHistory() <= 0:
 			print ("WARNING: No history found")
 		else:
@@ -115,9 +137,14 @@ class Group:
 		else:
 			print ("	Scheduled posts: ", self.scheduled_posts[0])
 
+		if self.findTimeGaps() > 0:
+			print ("INFO: Gaps found")
+
+		self.post_time = self.getTime()
+
 		# Loop through files omitting ones in self.history and post them
 		# Posting with self.conn
-
+		
 		print ("	posting to", self.name)
 
 if __name__ == "__main__":
