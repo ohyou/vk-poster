@@ -1,3 +1,7 @@
+'''
+	For licence, see: LICENSE
+'''
+
 import http.client, sys, json, os, vk, datetime, time, imghdr
 import requests as r
 from PIL import Image
