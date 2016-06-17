@@ -90,3 +90,4 @@ ENV/
 
 # Project-related
 .json
+access_token

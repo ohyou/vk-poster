@@ -11,8 +11,10 @@ class Connection:
 	# API requests here
 
 	def authorize(self):
-		session = vk.Session(access_token="2ab05ccf3630161b846412658e9d1bd40de756592513a6c0f3aab5a63f59655029c1190583165c1e22f9f")
-		self.vkapi = vk.API(session)
+		if os.path.exists("access_token"):
+			file = open("access_token")
+			session = vk.Session(access_token=file.read())
+			self.vkapi = vk.API(session)
 		return self.vkapi != None
 
 	# def request
@@ -75,11 +77,11 @@ class Group:
 	def post(self):
 		if self.conn.establish() == False:
 			print ("ERROR: No connection, aborting")
-			pass
+			return
 
 		if self.conn.authorize() == False:
-			print ("ERROR: API authorization failed, aboring")
-			pass
+			print ("ERROR: API authorization failed, aborting")
+			return
 
 		if self.loadHistory() <= 0:
 			print ("WARNING: No history found")
