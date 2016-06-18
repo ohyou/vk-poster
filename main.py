@@ -2,7 +2,7 @@
 	For license, see: LICENSE
 '''
 
-import http.client, sys, json, os, vk, datetime, time, imghdr, shutil, collections
+import http.client, sys, json, os, vk, datetime, time, imghdr, shutil, collections, urllib
 import requests as r
 from PIL import Image
 from redditdownload import download as DL
@@ -15,8 +15,8 @@ class Utils:
 							datetime.timedelta(minutes=mins)).timetuple())
 
 	@staticmethod
-	def isImageTooBig(filename):
-		im = Image.open(prepend_path + folder_name + "/" + filename)
+	def isImageTooBig(filepath):
+		im = Image.open(filepath)
 		filex,filey = im.size
 		im.close()
 		return (filey/filex) > 3
@@ -36,22 +36,31 @@ class Connection:
 			self.vkapi = vk.API(session)
 		return self.vkapi != None
 
-	def fileUpload(self, group_id, file_path, too_big):
-		n, ext = os.path.splitext(file_path)
+	def fileUpload(self, group_id, file_name, file_path, too_big):
+		n, ext = os.path.splitext(file_name)
 		upload_data = {}
 
 		try:
 			if ext == ".gif" or too_big:
-				upload_data = vkapi.docs.getWallUploadServer(group_id=group_id)
+				upload_data = self.vkapi.docs.getWallUploadServer(group_id=group_id)
 			else:
-				upload_data = vkapi.photos.getWallUploadServer(group_id=group_id)
+				upload_data = self.vkapi.photos.getWallUploadServer(group_id=group_id)
+		except vk.api.VkAPIError as e:
+			print ("ERROR: Couldn't get the upload server:", e)
+			return {}
 		except:
-			print ("ERROR: Couldn't get the upload server")
+			print ("ERROR: Couldn't get the upload server:", sys.exc_info()[0])
 			return {}
 
-		upload_response = r.post(upload_data[u"upload_url"], files=open(file_path, "rb"))
-		upload_response = upload_response.json()
+		data = {}
+		files = {'photo': (file_name, open(file_path, 'rb'))}
+		url = upload_data['upload_url'].split('?')[0]
 
+		for key, value in urllib.parse.parse_qs(upload_data['upload_url'].split('?')[1]).items():
+			data[key] = value
+
+		upload_response = r.post(url, data, files=files)
+		upload_response = upload_response.json()
 
 		if "__error" in upload_response:
 			print ("ERROR: Couldn't upload the file: ", upload_response["__error"])
@@ -59,37 +68,40 @@ class Connection:
 
 		return upload_response
 
-	def fileSave(self, group_id, file_path, too_big, upload_response, group_name):
-		n, ext = os.path.splitext(file_path)
+	def fileSave(self, group_id, file_name, file_path, too_big, upload_response, group_name):
+		n, ext = os.path.splitext(file_name)
 
 		try:
 			if ext == ".gif" or too_big:
-				save_response = vkapi.docs.save(file=upload_response["file"], 
+				save_response = self.vkapi.docs.save(file=upload_response["file"], 
 												title="re/" + group_name + "/" + n)
 			else:
-				save_response = vkapi.photos.saveWallPhoto( group_id=group_id, 
-															server=upload_response[u"server"], 
-															hash=upload_response[u"hash"], 
-															photo=upload_response[u"photo"])
+				save_response = self.vkapi.photos.saveWallPhoto( group_id=group_id, 
+															server=upload_response["server"], 
+															hash=upload_response["hash"], 
+															photo=upload_response["photo"])
 			save_response = save_response[0]
+		except vk.api.VkAPIError as e:
+			print ("ERROR: Couldn't save file on the server:", e)
+			return {}
 		except:
-			print ("ERROR: Couldn't save file on the server")
+			print ("ERROR: Couldn't save file on the server:", sys.exc_info()[0])
 			return {}
 
 		return save_response
 
-	def filePost(self, group_id, file_path, too_big, save_response, group_name, publish_time):
-		n, ext = os.path.splitext(file_path)
+	def filePost(self, group_id, file_name, file_path, too_big, save_response, group_name, publish_time):
+		n, ext = os.path.splitext(file_name)
 		source = "https://reddit.com/r/" + group_name + "/comments/" + n + "/"
 
 		try:
 			if ext == ".gif" or too_big:
-				post_id = vkapi.wall.post(owner_id=group_id, 
+				post_id = self.vkapi.wall.post(owner_id=group_id, 
 											from_group=1, 
 											attachments=str(save_response["id"]) + "," + source, 
 											publish_date=publish_time)
 			else:
-				post_id = vkapi.wall.post(owner_id=group_id, 
+				post_id = self.vkapi.wall.post(owner_id=group_id, 
 											from_group=1, 
 											attachments = str(save_response["id"]) + "," + source,
 											publish_date=publish_time)
@@ -98,7 +110,7 @@ class Connection:
 			print ("ERROR: Couldn't post the file: ", e)
 			return {}
 
-
+		return post_id
 
 
 	# def get # wall/scheduled data
@@ -132,6 +144,8 @@ class Group:
 		if not os.path.exists(self.download_dir):
 			os.mkdir(self.download_dir)
 
+		shutil.rmtree(self.pics_dir, ignore_errors=True)
+
 		args = lambda: None
 		args.reddit = self.name
 		args.dir = self.pics_dir
@@ -144,11 +158,12 @@ class Group:
 		args.regex = None
 		args.verbose = False
 
-		shutil.rmtree(args.dir, ignore_errors=True)
-
+		print ("    Downloading...")
 		DL(args)
 
 		path, dirs, files = next(os.walk(args.dir))
+
+		print ("    Downloaded:", len(files))
 		return len(files)
 		
 	def findTimeGaps(self, posts, max_gap):
@@ -169,7 +184,8 @@ class Group:
 		if len(self.gaps) > 0:
 			return self.gaps.pop()
 
-		return Utils.addTime(self.post_time, 60)
+		self.post_time = Utils.addTime(self.post_time, 60)
+		return self.post_time if self.post_time > time.time() else time.time()
 		
 
 	def getScheduledPosts(self):
@@ -216,6 +232,7 @@ class Group:
 				print ("WARNING: Could not save history")
 
 	def post(self):
+		print ("")
 		print ("GROUP:", self.name)
 
 		if self.conn.establish() == False:
@@ -226,56 +243,89 @@ class Group:
 			print ("ERROR: API authorization failed, aborting")
 			return
 
-		#if self.download() <= 0:
-		#	print ("ERROR: Nothing was downloaded")
-		#	return
+		if self.download() <= 0:
+			print ("ERROR: Nothing was downloaded")
+			return
 
 		if self.loadHistory() <= 0:
 			print ("WARNING: No history found")
 		else:
-			print ("	History: ", len(self.history))
+			print ("    History: ", len(self.history))
 
 		if self.getScheduledPosts() <= 0:
 			print ("WARNING: No scheduled posts")
 		else:
-			print ("	Scheduled posts: ", self.scheduled_posts[0])
+			print ("    Scheduled posts: ", self.scheduled_posts[0])
 
-		if self.findTimeGaps(self.scheduled_posts, 5500) > 0:
+		if self.findTimeGaps(self.scheduled_posts, 3600) > 0:
 			print ("INFO: Gaps found")
 
 
 		posted = 0
 
-		for filename in os.listdir(self.pics_dir):
-			if self.inHistory(filename):
+		for file_name in os.listdir(self.pics_dir):
+			if self.inHistory(file_name):
 				continue
 
-			print("    Posting", filename)
+			print("    Posting", file_name)
 
+			file_path = self.pics_dir + "/" + file_name
+			too_big = Utils.isImageTooBig(file_path)
+			upload_response = {}
+			save_response = {}
+			post_id = {}
+
+			# TODO: refactor this
+
+			retry = 0
+			while retry < 5 and not upload_response:
+				upload_response = self.conn.fileUpload(abs(self.id), file_name, file_path, too_big)
+				retry += 1
+				time.sleep(1)
+
+			if retry >= 5 and not upload_response:
+				print("ERROR: Failed to get upload_response")
+				continue
+
+			retry = 0
+			while retry < 5 and not save_response:
+				save_response = self.conn.fileSave(abs(self.id), file_name, file_path, too_big, upload_response, self.name)
+				retry += 1
+				time.sleep(1)
+
+			if retry >= 5 and not save_response:
+				print("ERROR: Failed to get save_response")
+				continue
+
+			retry = 0
+			while retry < 5 and not post_id:
+				post_id = self.conn.filePost(self.id, file_name, file_path, too_big, save_response, self.name, self.getTime())
+				retry += 1
+				time.sleep(1)
+
+			if retry >= 5 and not post_id:
+				print("ERROR: Failed to get post_id")
+				continue
 
 
 			posted += 1
-			self.addToHistory(filename)
+			self.addToHistory(file_name)
+			time.sleep(1)
 			
 		print("    Files posted:", posted)
 		print("    Files scheduled:", self.scheduled_posts[0] + posted)
 
 		self.saveHistory()
-
-		#self.post_time = self.getTime()
-
-		# Loop through files omitting ones in self.history and post them
-		# Posting with self.conn
 		
 		
 
 if __name__ == "__main__":
 	conn = Connection()
 
-	#g_meirl = Group(conn, 'me_irl', -99583108)
+	g_meirl = Group(conn, 'me_irl', -99583108)
 	g_4chan = Group(conn, '4chan', -99632260)
-	#g_bpt	= Group(conn, 'BlackPeopleTwitter', -99632081)
+	g_bpt	= Group(conn, 'BlackPeopleTwitter', -99632081)
 
-	#g_meirl.post()
+	g_meirl.post()
 	g_4chan.post()
-	#g_bpt.post()
+	g_bpt.post()
