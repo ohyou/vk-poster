@@ -27,8 +27,6 @@ class Connection:
 		self.attempts = 0
 		self.vkapi = None
 
-	# API requests here
-
 	def authorize(self):
 		if os.path.exists("access_token"):
 			file = open("access_token")
@@ -111,10 +109,6 @@ class Connection:
 			return {}
 
 		return post_id
-
-
-	# def get # wall/scheduled data
-	#	return json?
 
 	def establish(self):
 		conn = http.client.HTTPConnection('www.google.com')
