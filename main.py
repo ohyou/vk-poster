@@ -5,7 +5,11 @@
 import http.client, sys, json, os, vk, datetime, time, imghdr, shutil, collections, urllib
 import requests as r
 from PIL import Image
-from redditdownload import download as DL
+
+sys.path.insert(0, './lib/RedditImageGrab')
+
+import redditdl as DL
+
 
 class Utils:
 
@@ -140,20 +144,9 @@ class Group:
 
 		shutil.rmtree(self.pics_dir, ignore_errors=True)
 
-		args = lambda: None
-		args.reddit = self.name
-		args.dir = self.pics_dir
-		args.last = ''
-		args.score = 0
-		args.num = 25
-		args.update = False
-		args.sfw = False
-		args.nsfw = False
-		args.regex = None
-		args.verbose = False
-
 		print ("    Downloading...")
-		DL(args)
+
+		DL.main([self.name, self.pics_dir, "--num", "25"])
 
 		path, dirs, files = next(os.walk(args.dir))
 
@@ -254,7 +247,6 @@ class Group:
 		if self.findTimeGaps(self.scheduled_posts, 3600) > 0:
 			print ("INFO: Gaps found")
 
-
 		posted = 0
 
 		for file_name in os.listdir(self.pics_dir):
@@ -310,7 +302,6 @@ class Group:
 		print("    Files scheduled:", self.scheduled_posts[0] + posted)
 
 		self.saveHistory()
-		
 		
 
 if __name__ == "__main__":
