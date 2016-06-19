@@ -1,5 +1,7 @@
 ## Requirements
 
++ Clone this repository **recursively**
+
 + Anaconda python package, available at: https://www.continuum.io/downloads
 
 + Python 3
