@@ -2,14 +2,13 @@
 	For license, see: LICENSE
 '''
 
-import http.client, sys, json, os, vk, datetime, time, imghdr, shutil, collections, urllib
+import http.client, sys, json, os, vk, datetime, time, imghdr, shutil, collections, urllib, logging
 import requests as r
 from PIL import Image
 
 sys.path.insert(0, './lib/RedditImageGrab')
 
 import redditdl as DL
-
 
 class Utils:
 
@@ -146,12 +145,12 @@ class Group:
 
 		print ("    Downloading...")
 
-		DL.main([self.name, self.pics_dir, "--num", "25"])
+		downloaded = DL.main([self.name, self.pics_dir, "--num", "25"])
 
-		path, dirs, files = next(os.walk(args.dir))
+		#path, dirs, files = next(os.walk(self.pics_dir))
 
-		print ("    Downloaded:", len(files))
-		return len(files)
+		print ("    Downloaded:", downloaded)
+		return downloaded
 		
 	def findTimeGaps(self, posts, max_gap):
 		if len(posts) <= 0 or posts[0] == 0:
@@ -305,6 +304,9 @@ class Group:
 		
 
 if __name__ == "__main__":
+	logging.getLogger("requests").setLevel(logging.WARNING)
+	logging.getLogger("redditdownload").setLevel(logging.CRITICAL)
+
 	conn = Connection()
 
 	g_meirl = Group(conn, 'me_irl', -99583108)
