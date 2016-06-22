@@ -40,10 +40,12 @@ class Connection:
 	def fileUpload(self, group_id, file_name, file_path, too_big):
 		n, ext = os.path.splitext(file_name)
 		upload_data = {}
+		file_type = 'photo'
 
 		try:
 			if ext == ".gif" or too_big:
 				upload_data = self.vkapi.docs.getWallUploadServer(group_id=group_id)
+				file_type = 'file'
 			else:
 				upload_data = self.vkapi.photos.getWallUploadServer(group_id=group_id)
 		except vk.api.VkAPIError as e:
@@ -51,10 +53,17 @@ class Connection:
 			return {}
 		except:
 			print ("ERROR: Couldn't get the upload server:", sys.exc_info()[0])
+			return {}		
+
+		try:
+			f = open(file_path, 'rb')
+			files = {file_type: (file_name, f)}
+		except:
+			print ("ERROR: File I/O failed")
 			return {}
 
+
 		data = {}
-		files = {'photo': (file_name, open(file_path, 'rb'))}
 		url = upload_data['upload_url'].split('?')[0]
 
 		for key, value in urllib.parse.parse_qs(upload_data['upload_url'].split('?')[1]).items():
@@ -71,6 +80,7 @@ class Connection:
 			print ("ERROR: Couldn't upload the file: ", upload_response["__error"])
 			return {}
 
+		f.close()
 		return upload_response
 
 	def fileSave(self, group_id, file_name, file_path, too_big, upload_response, group_name):
@@ -103,7 +113,7 @@ class Connection:
 			if ext == ".gif" or too_big:
 				post_id = self.vkapi.wall.post(owner_id=group_id, 
 											from_group=1, 
-											attachments=str(save_response["id"]) + "," + source, 
+											attachments=save_response["url"].split("/")[3] + "," + source, 
 											publish_date=publish_time)
 			else:
 				post_id = self.vkapi.wall.post(owner_id=group_id, 
