@@ -60,8 +60,12 @@ class Connection:
 		for key, value in urllib.parse.parse_qs(upload_data['upload_url'].split('?')[1]).items():
 			data[key] = value
 
-		upload_response = r.post(url, data, files=files)
-		upload_response = upload_response.json()
+		try:
+			upload_response = r.post(url, data, files=files)
+			upload_response = upload_response.json()
+		except:
+			print ("ERROR: Failed to decode the upload_response")
+			return {}
 
 		if "__error" in upload_response:
 			print ("ERROR: Couldn't upload the file: ", upload_response["__error"])
@@ -295,6 +299,7 @@ class Group:
 
 			posted += 1
 			self.addToHistory(file_name)
+			self.saveHistory()
 			time.sleep(1)
 			
 		print("    Files posted:", posted)
