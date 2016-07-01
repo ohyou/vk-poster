@@ -161,8 +161,6 @@ class Group:
 
 		downloaded = DL.main([self.name, self.pics_dir, "--num", "25"])
 
-		#path, dirs, files = next(os.walk(self.pics_dir))
-
 		print ("    Downloaded:", downloaded)
 		return downloaded
 		
@@ -264,6 +262,11 @@ class Group:
 
 		for file_name in os.listdir(self.pics_dir):
 			if self.inHistory(file_name):
+				continue
+
+			n, ext = os.path.splitext(file_name)
+
+			if (ext not in [".jpg", ".png", ".gif"]):
 				continue
 
 			print("    Posting", file_name)
