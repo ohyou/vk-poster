@@ -19,7 +19,11 @@ class Utils:
 
 	@staticmethod
 	def isImageTooBig(filepath):
-		im = Image.open(filepath)
+		try:
+			im = Image.open(filepath)
+		except:
+			print ("WARNING: Failed to open the image:", filepath)
+			return False
 		filex,filey = im.size
 		im.close()
 		return (filey/filex) > 3
